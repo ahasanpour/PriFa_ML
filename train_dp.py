@@ -307,69 +307,25 @@ class MemModule_sam(TrainLoop):
             # gv = objax.GradValues(loss, model.vars())
             vc = self.model.vars()
             train_vars = ModuleList(TrainRef(x) for x in vc.subset(TrainVar))
-            # gradient_norm = jnp.sqrt(sum([jnp.sum(jnp.square(e)) for e in jax.tree_util.tree_leaves(g)]))
-            # normalized_gradient = jax.tree_map(lambda x: x / gradient_norm, g)
-            # g = normalized_gradient
+
             norm_g = jnp.linalg.norm(jnp.array([jnp.linalg.norm(g_) for g_ in g]))
             # self.m = ModuleList(StateVar(jn.zeros_like(x.value)) for x in self.train_vars)
             assert len(g) == len(train_vars), 'Expecting as many gradients as trainable variables'
             scale = rho / (norm_g + 1e-12)
             e_ws = []
-            # for l, gr in zip(self.train_vars, normalized_gradient):
-            #
-            # train_vars = jax.tree_util.tree_map(lambda a, b: a + rho * b, train_vars, g)
-                # l.value -= m.value
+
             for i in range(len(train_vars)):
                 ew = g[i] * scale
                 train_vars[i].assign(train_vars[i] + ew)
                 e_ws.append(ew)
 
-            # noised_gv = objax.GradValues(loss, vc)
             g1, v1 = gv(x, y)
 
-            # train_vars_tmp = ModuleList(TrainRef(x) for x in vc.subset(TrainVar))
 
             for i in range(len(train_vars)):
                 train_vars[i].assign(train_vars[i] - e_ws[i])
-            # for l, gr in zip(self.train_vars, normalized_gradient):
-            #     l.value += rho * gr
-            # self.model.vars = train_vars_tmp
+
             return g1, v1
-
-        def get_asam_gradient2(model, g, progress):
-            # not implemented yet correctly
-            # gv = objax.GradValues(loss, model.vars())
-            vc = model.vars()
-            train_vars = ModuleList(TrainRef(x) for x in vc.subset(TrainVar))
-            gradient_norm = jnp.sqrt(sum([jnp.sum(jnp.square(e)) for e in jax.tree_util.tree_leaves(g)]))
-            normalized_gradient = jax.tree_map(lambda x: x / gradient_norm, g)
-            # self.m = ModuleList(StateVar(jn.zeros_like(x.value)) for x in train_vars)
-            assert len(g) == len(train_vars), 'Expecting as many gradients as trainable variables'
-            scale = rho / (gradient_norm + 1e-12)
-            lr = self.params.lr * jn.cos(progress * (7 * jn.pi) / (2 * 8))
-            lr = lr * jn.clip(progress * 100, 0, 1)
-            self.opt_sam(lr + scale, normalized_gradient)
-            self.model_ema_sam.update_ema()
-            noised_gv = objax.GradValues(loss, vc)
-
-            return noised_gv
-
-        def get_sam_gradient2(model, g, progress):
-            # gv = objax.GradValues(loss, model.vars())
-            vc = model.vars()
-            train_vars = ModuleList(TrainRef(x) for x in vc.subset(TrainVar))
-            gradient_norm = jnp.sqrt(sum([jnp.sum(jnp.square(e)) for e in jax.tree_util.tree_leaves(g)]))
-            normalized_gradient = jax.tree_map(lambda x: x / gradient_norm, g)
-            # self.m = ModuleList(StateVar(jn.zeros_like(x.value)) for x in train_vars)
-            assert len(g) == len(train_vars), 'Expecting as many gradients as trainable variables'
-            scale = rho / (gradient_norm + 1e-12)
-            lr = self.params.lr * jn.cos(progress * (7 * jn.pi) / (2 * 8))
-            lr = lr * jn.clip(progress * 100, 0, 1)
-            self.opt_sam(lr + scale, normalized_gradient)
-            self.model_ema_sam.update_ema()
-            noised_gv = objax.GradValues(loss, vc)
-
-            return noised_gv
 
         @objax.Function.with_vars(self.vars())
         def train_op(progress, x, y, lr_cos):
